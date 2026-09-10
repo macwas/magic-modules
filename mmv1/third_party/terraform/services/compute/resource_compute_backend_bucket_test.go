@@ -209,6 +209,60 @@ func TestAccComputeBackendBucket_withCdnCacheMode_update(t *testing.T) {
 	})
 }
 
+func TestAccComputeBackendBucket_cdnPolicyTtlZero(t *testing.T) {
+	t.Parallel()
+
+	backendName := fmt.Sprintf("tf-test-%s", acctest.RandString(t, 10))
+	storageName := fmt.Sprintf("tf-test-%s", acctest.RandString(t, 10))
+
+	acctest.VcrTest(t, resource.TestCase{
+		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		CheckDestroy:             testAccCheckComputeBackendBucketDestroyProducer(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccComputeBackendBucket_cdnPolicyTtlZero(backendName, storageName, 0, 0, 0),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("google_compute_backend_bucket.foobar", "cdn_policy.0.client_ttl", "0"),
+					resource.TestCheckResourceAttr("google_compute_backend_bucket.foobar", "cdn_policy.0.default_ttl", "0"),
+					resource.TestCheckResourceAttr("google_compute_backend_bucket.foobar", "cdn_policy.0.max_ttl", "0"),
+				),
+			},
+			{
+				ResourceName:      "google_compute_backend_bucket.foobar",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				Config: testAccComputeBackendBucket_cdnPolicyTtlZero(backendName, storageName, 3600, 1800, 7200),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("google_compute_backend_bucket.foobar", "cdn_policy.0.client_ttl", "3600"),
+					resource.TestCheckResourceAttr("google_compute_backend_bucket.foobar", "cdn_policy.0.default_ttl", "1800"),
+					resource.TestCheckResourceAttr("google_compute_backend_bucket.foobar", "cdn_policy.0.max_ttl", "7200"),
+				),
+			},
+			{
+				ResourceName:      "google_compute_backend_bucket.foobar",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				Config: testAccComputeBackendBucket_cdnPolicyTtlZero(backendName, storageName, 0, 0, 0),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("google_compute_backend_bucket.foobar", "cdn_policy.0.client_ttl", "0"),
+					resource.TestCheckResourceAttr("google_compute_backend_bucket.foobar", "cdn_policy.0.default_ttl", "0"),
+					resource.TestCheckResourceAttr("google_compute_backend_bucket.foobar", "cdn_policy.0.max_ttl", "0"),
+				),
+			},
+			{
+				ResourceName:      "google_compute_backend_bucket.foobar",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
 func TestAccComputeBackendBucket_withTags(t *testing.T) {
 	t.Parallel()
 
@@ -343,6 +397,28 @@ resource "google_storage_bucket" "bucket" {
   location = "EU"
 }
 `, backendName, age, max_ttl, ttl, ttl, ttl, code, ttl, storageName)
+}
+
+func testAccComputeBackendBucket_cdnPolicyTtlZero(backendName, storageName string, clientTtl, defaultTtl, maxTtl int) string {
+	return fmt.Sprintf(`
+resource "google_compute_backend_bucket" "foobar" {
+  name        = "%s"
+  bucket_name = google_storage_bucket.bucket.name
+  enable_cdn  = true
+
+  cdn_policy {
+    cache_mode  = "CACHE_ALL_STATIC"
+    client_ttl  = %d
+    default_ttl = %d
+    max_ttl     = %d
+  }
+}
+
+resource "google_storage_bucket" "bucket" {
+  name     = "%s"
+  location = "EU"
+}
+`, backendName, clientTtl, defaultTtl, maxTtl, storageName)
 }
 
 func testAccComputeBackendBucket_withSecurityPolicy(bucketName, polName, polLink string) string {
